@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin Dashboard - Skin Type Detector</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script defer src="admin.js"></script>
+  </head>
+  <body>
+    <main class="container">
+      <h1>Admin Dashboard</h1>
+
+      <div id="adminLogin" class="card">
+        <h2>Admin Login</h2>
+        <label>Username: <input id="adminUser" type="text" placeholder="admin username" value="olayinka"/></label>
+        <label>Password: <input id="adminPass" type="password" placeholder="password" value="admin"/></label>
+        <div style="margin-top:12px">
+          <button id="loginBtn" class="btn">Login</button>
+        </div>
+        <p style="color:#6b7280;margin-top:8px;font-size:13px">Login required to view feedback and download data.</p>
+      </div>
+
+      <div id="adminDashboard" style="display:none">
+        <div class="admin-controls">
+          <button id="loadBtn" class="btn">Load Data</button>
+          <button id="downloadBtn" class="btn">Download Excel</button>
+        </div>
+      </div>
+
+      <section class="card">
+        <h2>Feedback Summary</h2>
+        <p id="summaryText">Loading...</p>
+      </section>
+
+      <section class="card">
+        <h2>Entries by Skin Type</h2>
+        <canvas id="typeChart" aria-label="Entries by skin type" role="img"></canvas>
+      </section>
+
+      <section class="card">
+        <h2>Average Confidence by Skin Type</h2>
+        <canvas id="confidenceChart" aria-label="Average confidence by skin type" role="img"></canvas>
+      </section>
+
+      <section class="card">
+        <h2>Helpful Feedback Ratio</h2>
+        <canvas id="helpfulChart" aria-label="Helpful feedback ratio" role="img"></canvas>
+      </section>
+    </main>
+  </body>
+</html>

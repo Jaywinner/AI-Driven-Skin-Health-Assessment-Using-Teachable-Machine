@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f7fafc; }
+    .admin-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .admin-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 30px; }
+    .admin-header h1 { margin: 0; font-size: 24px; }
+    .admin-controls { display: flex; flex-wrap: wrap; gap: 10px; }
+    .admin-btn { padding: 10px 20px; background: #2b6cb0; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+    .admin-btn:hover { background: #1e4d7b; }
+    .admin-btn.secondary { background: #718096; }
+    .admin-btn.secondary:hover { background: #4a5568; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .stat-card h3 { margin: 0 0 15px 0; color: #2d3748; font-size: 16px; }
+    .chart-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .chart-container h3 { margin: 0 0 20px 0; color: #2d3748; font-size: 18px; }
+    .chart-container canvas { max-height: 300px; }
+    .login-form { max-width: 400px; margin: 50px auto; padding: 30px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .login-form h2 { margin: 0 0 20px 0; text-align: center; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; color: #4a5568; font-size: 14px; }
+    .form-group input { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 14px; }
+    .hidden { display: none; }
+    @media (max-width: 768px) {
+      .admin-container { padding: 15px; }
+      .admin-header { flex-direction: column; align-items: flex-start; }
+      .admin-header h1 { font-size: 20px; }
+      .admin-controls { width: 100%; }
+      .admin-btn { flex: 1; min-width: 100px; text-align: center; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .chart-container { padding: 15px; }
+      .login-form { margin: 30px 15px; padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Form -->
+  <div id="loginSection" class="login-form">
+    <h2>Admin Login</h2>
+    <div class="form-group">
+      <label for="username">Username</label>
+      <input type="text" id="username" placeholder="Enter username">
+    </div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="Enter password">
+    </div>
+    <button class="admin-btn" style="width: 100%;" onclick="login()">Login</button>
+    <div id="loginError" style="color: #e53e3e; margin-top: 10px; display: none;"></div>
+  </div>
+
+  <!-- Dashboard Section -->
+  <div id="dashboardSection" class="admin-container hidden">
+    <div class="admin-header">
+      <h1>Admin Dashboard</h1>
+      <div class="admin-controls">
+        <button class="admin-btn" onclick="loadData()">Refresh Data</button>
+        <button class="admin-btn secondary" onclick="downloadExcel()">Download Excel</button>
+        <button class="admin-btn secondary" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>Total Entries</h3>
+        <div id="totalEntries" style="font-size: 32px; font-weight: bold; color: #2b6cb0;">0</div>
+      </div>
+      <div class="stat-card">
+        <h3>Unique Skin Types</h3>
+        <div id="uniqueTypes" style="font-size: 32px; font-weight: bold; color: #2b6cb0;">0</div>
+      </div>
+      <div class="stat-card">
+        <h3>Helpful Feedback</h3>
+        <div id="helpfulCount" style="font-size: 32px; font-weight: bold; color: #2b6cb0;">0</div>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <h3>Entries by Skin Type</h3>
+      <canvas id="typeChart"></canvas>
+    </div>
+
+    <div class="chart-container">
+      <h3>Average Confidence by Skin Type</h3>
+      <canvas id="confidenceChart"></canvas>
+    </div>
+
+    <div class="chart-container">
+      <h3>Helpful Feedback Distribution</h3>
+      <canvas id="helpfulChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    let charts = { type: null, confidence: null, helpful: null };
+
+    // Check session on page load
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const res = await fetch('/api/feedback-data');
+        if (res.ok) {
+          // User is already logged in, show dashboard
+          document.getElementById('loginSection').classList.add('hidden');
+          document.getElementById('dashboardSection').classList.remove('hidden');
+          loadData();
+        }
+      } catch (err) {
+        // User not logged in, show login form
+        console.log('Not authenticated');
+      }
+    });
+
+    async function login() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const errorDiv = document.getElementById('loginError');
+      
+      if (!username || !password) {
+        errorDiv.textContent = 'Please enter username and password';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok && data.success) {
+          document.getElementById('loginSection').classList.add('hidden');
+          document.getElementById('dashboardSection').classList.remove('hidden');
+          loadData();
+        } else {
+          errorDiv.textContent = data.error || 'Invalid credentials';
+          errorDiv.style.display = 'block';
+        }
+      } catch (err) {
+        errorDiv.textContent = 'Login failed: ' + err.message;
+        errorDiv.style.display = 'block';
+      }
+    }
+
+    async function logout() {
+      try {
+        await fetch('/api/admin-logout', { method: 'POST' });
+      } catch (err) {
+        console.error('Logout error:', err);
+      }
+      document.getElementById('dashboardSection').classList.add('hidden');
+      document.getElementById('loginSection').classList.remove('hidden');
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch('/api/feedback-data');
+        
+        if (res.status === 401) {
+          alert('Session expired. Please login again.');
+          logout();
+          return;
+        }
+        
+        if (!res.ok) {
+          alert('Failed to load data');
+          return;
+        }
+        
+        const data = await res.json();
+        
+        // Update stats
+        document.getElementById('totalEntries').textContent = data.total || 0;
+        document.getElementById('uniqueTypes').textContent = Object.keys(data.counts || {}).length;
+        document.getElementById('helpfulCount').textContent = (data.helpful_counts && data.helpful_counts.Yes) || 0;
+        
+        // Render charts
+        renderTypeChart(data.counts || {});
+        renderConfidenceChart(data.avg_confidence || {});
+        renderHelpfulChart(data.helpful_counts || {});
+        
+      } catch (err) {
+        setDebug('Error: ' + err.message);
+        alert('Error loading data: ' + err.message);
+      }
+    }
+
+    function renderTypeChart(counts) {
+      const ctx = document.getElementById('typeChart');
+      if (charts.type) charts.type.destroy();
+      
+      const labels = Object.keys(counts);
+      const values = labels.map(k => counts[k]);
+      
+      charts.type = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Number of Entries',
+            data: values,
+            backgroundColor: '#2b6cb0'
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: true }
+      });
+    }
+
+    function renderConfidenceChart(avgConfidence) {
+      const ctx = document.getElementById('confidenceChart');
+      if (charts.confidence) charts.confidence.destroy();
+      
+      const labels = Object.keys(avgConfidence);
+      const values = labels.map(k => avgConfidence[k]);
+      
+      charts.confidence = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Average Confidence (%)',
+            data: values,
+            borderColor: '#e67e22',
+            backgroundColor: 'rgba(230, 126, 34, 0.1)',
+            tension: 0.4
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: true }
+      });
+    }
+
+    function renderHelpfulChart(helpfulCounts) {
+      const ctx = document.getElementById('helpfulChart');
+      if (charts.helpful) charts.helpful.destroy();
+      
+      const labels = Object.keys(helpfulCounts);
+      const values = labels.map(k => helpfulCounts[k]);
+      
+      charts.helpful = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: values,
+            backgroundColor: ['#48bb78', '#f56565', '#cbd5e0']
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: true }
+      });
+    }
+
+    async function downloadExcel() {
+      try {
+        const res = await fetch('/api/export-feedback');
+        
+        if (res.status === 401) {
+          alert('Session expired. Please login again.');
+          logout();
+          return;
+        }
+        
+        if (!res.ok) {
+          alert('Failed to download Excel file');
+          return;
+        }
+        
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'feedback_export.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        alert('Download failed: ' + err.message);
+      }
+    }
+
+    // Allow Enter key for login
+    document.getElementById('password').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') login();
+    });
+  </script>
+</body>
+</html>

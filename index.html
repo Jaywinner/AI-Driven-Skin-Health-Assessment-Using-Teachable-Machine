@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Skin Type Detector (Local Model)</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+    <script defer src="script.js"></script>
+  </head>
+  <body>
+    <main class="container">
+      <h1>Skin Type Detector (Local Model)</h1>
+
+      <div class="uploader">
+        <label class="file-label" for="imageInput">Choose image</label>
+        <input id="imageInput" type="file" accept="image/*" />
+        <button id="startCameraBtn" class="btn" type="button">Use Camera</button>
+        <button id="analyzeBtn" class="btn" type="button">Analyze now</button>
+      </div>
+
+      <div class="camera">
+        <video id="cameraVideo" autoplay playsinline></video>
+        <button id="captureBtn" class="btn" type="button" style="display:none">Capture</button>
+      </div>
+
+      <div id="status" class="status">Loading model...</div>
+
+      <div id="loadingSpinner" class="loading-spinner" style="display:none">
+        <div class="spinner"></div>
+        <p>Analyzing image...</p>
+      </div>
+
+      <div class="preview">
+        <img id="previewImage" alt="Image preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23f0f0f0' width='400' height='300'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='16' fill='%236b7280'%3EImage preview will appear here%3C/text%3E%3C/svg%3E" />
+      </div>
+
+      <section id="results" class="results" aria-live="polite"></section>
+
+      <div id="feedbackModal" class="modal" style="display:none">
+        <div class="modal-content">
+          <h3>Quick Feedback</h3>
+          <p>Was this analysis helpful?</p>
+          <div class="feedback-buttons">
+            <button class="btn" id="helpfulYes">Yes</button>
+            <button class="btn" id="helpfulNo">No</button>
+          </div>
+          <label for="feedbackText">Additional comments (optional):</label>
+          <textarea id="feedbackText" placeholder="Tell us what you think..."></textarea>
+          <button class="btn" id="submitFeedback">Submit</button>
+          <button class="btn" id="skipFeedback">Skip</button>
+        </div>
+      </div>
+
+      <section class="disclaimer">
+        <strong>Disclaimer:</strong>
+        <p>
+          This tool runs a local machine learning model in your browser and provides general advice only. It is
+          NOT medical advice. For medical concerns or diagnoses please consult a qualified healthcare professional.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
