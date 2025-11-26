@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const startCameraBtn = document.getElementById('startCameraBtn');
   const captureBtn = document.getElementById('captureBtn');
   const cameraVideo = document.getElementById('cameraVideo');
+  const cameraFrontBtn = document.getElementById('cameraFrontBtn');
+  const cameraBackBtn = document.getElementById('cameraBackBtn');
   const feedbackModal = document.getElementById('feedbackModal');
   const helpfulYesBtn = document.getElementById('helpfulYes');
   const helpfulNoBtn = document.getElementById('helpfulNo');
@@ -23,6 +25,18 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastAnalysisData = null;
   let feedbackHelpful = null;
   let feedbackShownForCurrentImage = false;
+  
+  function updateAnalyzeVisibility() {
+    if (!analyzeBtn) return;
+    // Show Analyze only when an image is loaded and camera is not active
+    if (imageLoaded && !cameraStream) {
+      analyzeBtn.style.display = 'inline-block';
+      // enable/disable based on model readiness
+      analyzeBtn.disabled = !model;
+    } else {
+      analyzeBtn.style.display = 'none';
+    }
+  }
 
   // Error message for missing image
   const noImageError = document.createElement('div');
@@ -52,11 +66,11 @@ document.addEventListener('DOMContentLoaded', () => {
       setStatus('Loading model...');
       model = await tmImage.load(modelURL, metadataURL);
       setStatus('Model loaded. Choose an image to analyze.');
-      if (analyzeBtn) analyzeBtn.disabled = false;
+      updateAnalyzeVisibility();
     } catch (err) {
       setStatus('Model failed to load. See results for details.');
       showError(err);
-      if (analyzeBtn) analyzeBtn.disabled = true;
+      updateAnalyzeVisibility();
     }
   }
 
@@ -69,18 +83,26 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Camera functions
-  async function startCamera() {
+  async function startCamera(facing) {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera API not supported in this browser');
       }
       setStatus('Requesting camera permission...');
-      cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      // Determine facing mode (user/front or environment/back). Parameter overrides saved preference.
+      const pref = facing || localStorage.getItem('cameraFacing') || 'environment';
+      localStorage.setItem('cameraFacing', pref);
+      // Use ideal to be flexible across devices
+      const constraints = { video: { facingMode: { ideal: pref } } };
+      cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
       cameraVideo.srcObject = cameraStream;
+      // Show the camera video in the preview area
       cameraVideo.style.display = 'block';
       captureBtn.style.display = 'inline-block';
+      // hide the static preview image while camera is active (desktop and mobile)
+      if (previewImg) previewImg.style.display = 'none';
       startCameraBtn.textContent = 'Stop Camera';
-      setStatus('Camera active — position your device and press Capture.');
+      setStatus('Camera active. Position your device and press Capture.');
     } catch (err) {
       showError(err);
     }
@@ -95,6 +117,8 @@ document.addEventListener('DOMContentLoaded', () => {
       cameraVideo.srcObject = null;
       cameraVideo.style.display = 'none';
       captureBtn.style.display = 'none';
+      // restore preview image visibility after stopping camera
+      if (previewImg) previewImg.style.display = 'block';
       startCameraBtn.textContent = 'Use Camera';
       setStatus('Camera stopped.');
     } catch (err) {
@@ -126,8 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
       imageLoaded = true;
       feedbackShownForCurrentImage = false;
 
-      // Run prediction automatically (wait for model readiness)
-      await runPrediction();
+      // Do not auto-run prediction after capture — wait for user to press Analyze
+      setStatus('Image captured. Click "Analyze now" to run prediction.');
+      updateAnalyzeVisibility();
     } catch (err) {
       showError(err);
     }
@@ -274,6 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
     imageLoaded = true;
     feedbackShownForCurrentImage = false;
     setStatus('Image ready. Click "Analyze now" to run prediction.');
+    updateAnalyzeVisibility();
   });
 
   analyzeBtn.addEventListener('click', async () => {
@@ -287,11 +313,28 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       await startCamera();
     }
+    updateAnalyzeVisibility();
   });
 
   captureBtn.addEventListener('click', async () => {
     await captureFrameAndAnalyze();
   });
+  // Front/Back camera buttons
+  if (cameraFrontBtn) {
+    cameraFrontBtn.addEventListener('click', async () => {
+      // start front-facing camera
+      if (cameraStream) stopCamera();
+      await startCamera('user');
+      updateAnalyzeVisibility();
+    });
+  }
+  if (cameraBackBtn) {
+    cameraBackBtn.addEventListener('click', async () => {
+      if (cameraStream) stopCamera();
+      await startCamera('environment');
+      updateAnalyzeVisibility();
+    });
+  }
 
   // Feedback modal event listeners
   helpfulYesBtn.addEventListener('click', () => {
@@ -346,6 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Kick off model load
   loadModel();
+  updateAnalyzeVisibility();
 
   // Stop camera if navigating away
   window.addEventListener('beforeunload', () => {
